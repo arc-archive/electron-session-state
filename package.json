@@ -1,0 +1,23 @@
+{
+  "name": "@advanced-rest-client/electron-session-state",
+  "version": "1.0.0-rc1",
+  "description": "Electron library to read or set session cookies for Advanced REST Client",
+  "main": "main/index.js",
+  "scripts": {
+    "test": "electron-mocha test/*.main.test.js",
+    "test-renderer": "electron-mocha --require-main test/main-preload.js --renderer test/*.renderer.test.js"
+  },
+  "author": "Pawel Psztyc",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@advanced-rest-client/arc-electron-helpers": "^1.0.0-rc1",
+    "@advanced-rest-client/cookie-parser": "^2.0.0",
+    "electron-log": "^2.2.16"
+  },
+  "devDependencies": {
+    "chai": "^4.1.2",
+    "electron": "^2.0.7",
+    "electron-mocha": "^6.0.4",
+    "mocha": "^4.1.0"
+  }
+}
