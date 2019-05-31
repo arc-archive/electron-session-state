@@ -11,13 +11,16 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@advanced-rest-client/arc-electron-helpers": "^1.0.0",
-    "@advanced-rest-client/cookie-parser": "^2.0.0",
-    "electron-log": "^2.2.16"
+    "@advanced-rest-client/cookie-parser": "^3.0.0",
+    "electron-log": "^3.0.6"
   },
   "devDependencies": {
     "chai": "^4.1.2",
     "electron": "^4.0.2",
     "electron-mocha": "^6.0.4",
     "mocha": "^4.1.0"
+  },
+  "repository": {
+    "url": "https://github.com/advanced-rest-client/electron-session-state"
   }
 }
