@@ -3,24 +3,43 @@
   "version": "1.0.1",
   "description": "Electron library to read or set session cookies for Advanced REST Client",
   "main": "main/index.js",
+  "module": "main/SessionManager.js",
   "scripts": {
-    "test": "electron-mocha test/*.main.test.js",
+    "test": "npm run test-main && npm run test-renderer",
+    "test-main": "electron-mocha test/*.main.test.js",
     "test-renderer": "electron-mocha --require-main test/main-preload.js --renderer test/*.renderer.test.js"
   },
   "author": "Pawel Psztyc",
   "license": "Apache-2.0",
   "dependencies": {
-    "@advanced-rest-client/arc-electron-helpers": "^1.0.0",
-    "@advanced-rest-client/cookie-parser": "^3.0.0",
-    "electron-log": "^3.0.6"
+    "@advanced-rest-client/arc-electron-helpers": "^1.1.1",
+    "@advanced-rest-client/cookie-parser": "^3.1.0",
+    "electron": "^7.1.7",
+    "esm": "^3.2.25"
+  },
+  "peerDependencies": {
+    "electron": "^7.1.7"
   },
   "devDependencies": {
-    "chai": "^4.1.2",
-    "electron": "^4.0.2",
-    "electron-mocha": "^6.0.4",
-    "mocha": "^4.1.0"
+    "@advanced-rest-client/eslint-config": "^1.1.4",
+    "@advanced-rest-client/prettier-config": "^0.1.0",
+    "chai": "^4.2.0",
+    "electron-mocha": "^8.1.2",
+    "mocha": "^6.2.2",
+    "eslint": "^6.8.0",
+    "@commitlint/cli": "^8.2.0",
+    "@commitlint/config-conventional": "^8.2.0",
+    "lint-staged": "^9.5.0",
+    "husky": "^3.1.0",
+    "electron": "^7.1.7"
   },
   "repository": {
     "url": "https://github.com/advanced-rest-client/electron-session-state"
+  },
+  "lint-staged": {
+    "*.js": [
+      "eslint --fix",
+      "git add"
+    ]
   }
 }

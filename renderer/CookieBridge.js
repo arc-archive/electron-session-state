@@ -1,18 +1,14 @@
-const {ipcRenderer: ipc} = require('electron');
-const {ArcHeaders} = require('@advanced-rest-client/arc-electron-helpers/renderer');
-const {Cookies} = require('@advanced-rest-client/cookie-parser');
-const log = require('electron-log');
+import { ipcRenderer as ipc } from 'electron';
+import { ArcHeaders } from '@advanced-rest-client/arc-electron-helpers';
+import { Cookies } from '@advanced-rest-client/cookie-parser';
 /**
  * Class responsible for cookie exchange between web app and the main process.
  */
-class CookieBridge {
+export class CookieBridge {
   constructor() {
-    this._requestId = 0;
-    this._promises = [];
     this._onRequestAllCookies = this._onRequestAllCookies.bind(this);
     this._onRequestDomainCookies = this._onRequestDomainCookies.bind(this);
     this._onUpdateCookie = this._onUpdateCookie.bind(this);
-    this._onCookieSessionResponse = this._onCookieSessionResponse.bind(this);
     this._onCookieChanged = this._onCookieChanged.bind(this);
     this._onRemoveCookies = this._onRemoveCookies.bind(this);
     this._beforeRequestHandler = this._beforeRequestHandler.bind(this);
@@ -26,7 +22,6 @@ class CookieBridge {
     window.addEventListener('session-cookie-update', this._onUpdateCookie);
     window.addEventListener('before-request', this._beforeRequestHandler);
     window.addEventListener('response-ready', this._afterRequestHandler);
-    ipc.on('cookie-session-response', this._onCookieSessionResponse);
     ipc.on('cookie-changed', this._onCookieChanged);
   }
 
@@ -37,35 +32,83 @@ class CookieBridge {
     window.removeEventListener('session-cookie-update', this._onUpdateCookie);
     window.removeEventListener('before-request', this._beforeRequestHandler);
     window.removeEventListener('response-ready', this._afterRequestHandler);
-    ipc.removeListener('cookie-session-response', this._onCookieSessionResponse);
     ipc.removeListener('cookie-changed', this._onCookieChanged);
   }
 
-  _appendPromise(id) {
-    const p = new Promise((resolve, reject) => {
-      this._promises.push({
-        id,
-        resolve,
-        reject
-      });
-    });
-    return p;
+  /**
+   * @return {Promise<Array<Object>>} List of all cookies in the cookie session
+   * partition.
+   */
+  async getAllCookies() {
+    return await ipc.invoke('cookies-session-get-all');
   }
 
-  _onCookieSessionResponse(e, id, data, isError) {
-    const index = this._promises.findIndex((p) => p.id === id);
-    if (index === -1) {
-      log.warn('Promise not found');
-      return;
-    }
-    const promise = this._promises[index];
-    this._promises.splice(index, 1);
-    if (isError) {
-      promise.reject(new Error(data.message));
+  /**
+   * @param {String} domain Cookies domain name
+   * @return {Promise<Array<Object>>} List of domain cookies in the cookie session
+   * partition.
+   */
+  async getDomainCookies(domain) {
+    return await ipc.invoke('cookies-session-get-domain', domain);
+  }
+
+  /**
+   * Removes cookie or cookies from the store.
+   * @param {Object|Array<Object>} cookies A cookie or a list of cookies to delete.
+   * @return {Promise}
+   */
+  async removeCookies(cookies) {
+    if (Array.isArray(cookies)) {
+      return await ipc.invoke('cookies-session-remove-cookies', cookies);
     } else {
-      promise.resolve(data);
+      return await ipc.invoke('cookies-session-remove-cookie', cookies);
     }
   }
+
+  /**
+   * Creates or updates cookies in the cookies partition.
+   * @param {Object} cookie ARC's cookie definition.
+   * @return {Promise}
+   */
+  async updateCookie(cookie) {
+    const electronCookie = this._translateCookieForElectron(cookie);
+    return await ipc.invoke('cookies-session-set-cookie', electronCookie);
+  }
+
+  /**
+   * Stores list of cookies in the store.
+   *
+   * @param {Array<Object>} cookies List of cookies to store
+   * @return {Promise} Resolved promise when all cookies are stored.
+   */
+  async updateCookies(cookies) {
+    if (!cookies || !cookies.length) {
+      return;
+    }
+    cookies = cookies.map((item) => {
+      if (item.toJSON) {
+        // compatibility with cookie-parser of ARC
+        item = item.toJSON();
+      }
+      item = this._translateCookieForElectron(item);
+      return item;
+    });
+    return await ipc.invoke('cookies-session-set-cookies', cookies);
+  }
+
+  /**
+   * Dispatches a DOM event.
+   * @param {String} type Event type
+   * @param {any} detail Event detail object
+   */
+  fire(type, detail) {
+    const e = new CustomEvent(type, {
+      detail,
+      bubbles: true
+    });
+    document.body.dispatchEvent(e);
+  }
+
   /**
    * Web cookies model have `expires` property which is a timestamp
    * in miliseconds intead of seconds as `expirationDate`. This has to be
@@ -102,70 +145,79 @@ class CookieBridge {
     return cookie;
   }
 
+  /**
+   * Handler for the `session-cookie-list-all` DOM event.
+   * Sets a result of calling `getAllCookies()` to `detail.result` property.
+   * @param {CustomEvent} e
+   */
   _onRequestAllCookies(e) {
     if (e.defaultPrevented) {
       return;
     }
     e.preventDefault();
-    const id = ++this._requestId;
-    ipc.send('cookies-session', {
-      action: 'get',
-      type: 'all',
-      id: id
-    });
-    const p = this._appendPromise(id);
-    p.then((cookies) => this._translateCookiesForWeb(cookies));
-    e.detail.result = p;
+    e.detail.result = this.getAllCookies();
   }
 
+  /**
+   * Handler for the `session-cookie-list-domain` DOM event.
+   * Sets a result of calling `getDomainCookies()` to `detail.result` property.
+   *
+   * It expects the `domain` property to be set on the `detail` object.
+   *
+   * @param {CustomEvent} e
+   */
   _onRequestDomainCookies(e) {
     if (e.defaultPrevented) {
       return;
     }
     e.preventDefault();
-    const id = ++this._requestId;
-    const domain = e.detail.domain;
-    ipc.send('cookies-session', {
-      action: 'get',
-      type: 'domain',
-      domain,
-      id: id
-    });
-    const p = this._appendPromise(id);
-    p.then((cookies) => this._translateCookiesForWeb(cookies));
-    e.detail.result = p;
+    const { domain } = e.detail;
+    e.detail.result = this.getDomainCookies(domain);
   }
 
+  /**
+   * Handler for the `session-cookie-remove` DOM event.
+   * Sets a result of calling `removeCookies(detail.remove)` to `detail.result` property.
+   *
+   * It expects the `cookies` property to be set on the `detail` object.
+   *
+   * @param {CustomEvent} e
+   */
   _onRemoveCookies(e) {
     if (e.defaultPrevented) {
       return;
     }
     e.preventDefault();
-    const id = ++this._requestId;
-    const cookies = e.detail.cookies;
-    ipc.send('cookies-session', {
-      action: 'remove',
-      cookies: cookies,
-      id: id
-    });
-    e.detail.result = this._appendPromise(id);
+    const { cookies } = e.detail;
+    e.detail.result = this.removeCookies(cookies);
   }
 
+  /**
+   * Handler for the `session-cookie-update` DOM event.
+   * Sets a result of calling `updateCookie(detail.cookie)` to `detail.result` property.
+   *
+   * It expects the `cookie` property to be set on the `detail` object.
+   *
+   * @param {CustomEvent} e
+   */
   _onUpdateCookie(e) {
     if (e.defaultPrevented) {
       return;
     }
     e.preventDefault();
-    const id = ++this._requestId;
-    const cookie = this._translateCookieForElectron(e.detail.cookie);
-    ipc.send('cookies-session', {
-      action: 'set',
-      cookie: cookie,
-      id: id
-    });
-    e.detail.result = this._appendPromise(id);
+    e.detail.result = this.updateCookie(e.detail.cookie);
   }
 
+  /**
+   * A handler from main thread's `cookie-changed` event.
+   * It dispatches `session-cookie-removed` or `session-cookie-changed` DOM event,
+   * depanding on the change defiitino.
+   *
+   * @param {Event} e IPC event
+   * @param {Object} data Cookie data
+   * @param {Object} data.cookie The electron cookie object
+   * @param {Boolean=} data.removed Set when a cookie was removed. Otherwise it is changed.
+   */
   _onCookieChanged(e, data) {
     const cookie = this._translateCookieForWeb(data.cookie);
     if (data.removed) {
@@ -175,26 +227,16 @@ class CookieBridge {
     }
   }
 
-  fire(type, detail) {
-    const e = new CustomEvent(type, {
-      detail,
-      bubbles: true
-    });
-    document.body.dispatchEvent(e);
-  }
   /**
    * Handler for the ARC's event `before-request`.
    * The event is handled asynchronously.
    * @param {CustomEvent} e
    */
   _beforeRequestHandler(e) {
-    const promise = new Promise(function(request, resolve, reject) {
-      this._processBeforeRequest(request, resolve, reject);
-    }.bind(this, e.detail));
     if (!e.detail.promises) {
       e.detail.promises = [];
     }
-    e.detail.promises.push(promise);
+    e.detail.promises.push(this._processBeforeRequest(e.detail));
   }
 
   /**
@@ -205,13 +247,10 @@ class CookieBridge {
    * @param {Function} resolve
    * @param {Function} reject
    */
-  _processBeforeRequest(request, resolve, reject) {
-    this.getCookiesHeaderValue(request.url)
-    .then((cookie) => {
-      this._applyCookieHeader(cookie, request);
-      resolve(request);
-    })
-    .catch(reject);
+  async _processBeforeRequest(request) {
+    const cookie = await this.getCookiesHeaderValue(request.url);
+    this._applyCookieHeader(cookie, request);
+    return request;
   }
 
   /**
@@ -220,14 +259,12 @@ class CookieBridge {
    * @param {String} url An URL for cookies.
    * @return {Promise<String>} Promise that resolves to header value string.
    */
-  getCookiesHeaderValue(url) {
-    return this.getCookies(url)
-    .then(function(cookies) {
-      if (!cookies) {
-        cookies = [];
-      }
-      return cookies.map((c) => c.name + '=' + c.value).join('; ');
-    });
+  async getCookiesHeaderValue(url) {
+    const cookies = await this.getCookies(url);
+    if (!cookies || !cookies.length) {
+      return '';
+    }
+    return cookies.map((c) => c.name + '=' + c.value).join('; ');
   }
   /**
    * Gets a list of cookies for given URL (matching domain and path as defined
@@ -236,15 +273,8 @@ class CookieBridge {
    * @param {String} url An URL to match cookies.
    * @return {Promise<Array>} List of database objects that matches cookies.
    */
-  getCookies(url) {
-    const id = ++this._requestId;
-    ipc.send('cookies-session', {
-      action: 'get',
-      type: 'url',
-      url: url,
-      id: id
-    });
-    return this._appendPromise(id);
+  async getCookies(url) {
+    return await ipc.invoke('cookies-session-get-url', url);
   }
 
   /**
@@ -261,7 +291,6 @@ class CookieBridge {
     if (!header) {
       return;
     }
-    log.info('Cookies to send with the request:', header);
     const headers = new ArcHeaders(request.headers);
     headers.append('cookie', header);
     request.headers = headers.toString();
@@ -296,7 +325,7 @@ class CookieBridge {
       return;
     }
     const result = this.extract(response, request.url, redirects);
-    return this._store(result.cookies);
+    return this.updateCookies(result.cookies);
   }
 
   /**
@@ -354,30 +383,4 @@ class CookieBridge {
       expired: expired
     };
   }
-
-  /**
-   * Stores received cookies in the datastore.
-   *
-   * @param {Array} cookies List of cookies to store
-   * @return {Promise} Resolved promise when all cookies are stored.
-   */
-  _store(cookies) {
-    if (!cookies || !cookies.length) {
-      return;
-    }
-    cookies = cookies.map((item) => {
-      item = item.toJSON();
-      item = this._translateCookieForElectron(item);
-      return item;
-    });
-    const id = ++this._requestId;
-    ipc.send('cookies-session', {
-      action: 'set',
-      cookies,
-      id
-    });
-    return this._appendPromise(id)
-    .catch((cause) => log.error(cause));
-  }
 }
-exports.CookieBridge = CookieBridge;

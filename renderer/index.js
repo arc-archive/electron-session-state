@@ -1,1 +1,2 @@
-exports.CookieBridge = require('./cookie-bridge').CookieBridge;
+require = require('esm')(module);
+module.exports = require('./CookieBridge.js');

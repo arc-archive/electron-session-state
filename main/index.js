@@ -1,1 +1,2 @@
-exports.SessionManager = require('./session-manager').SessionManager;
+require = require('esm')(module);
+module.exports = require('./SessionManager.js');

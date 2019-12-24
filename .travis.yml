@@ -1,7 +1,14 @@
 language: node_js
-node_js: 8
+node_js: 12
+addons:
+  apt:
+    packages:
+      - xvfb
 before_script:
-  - export DISPLAY=:99.0; sh -e /etc/init.d/xvfb start
+  - export DISPLAY=':99.0'
+  - Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+install:
+  - npm ci
+  - npm i --no-save electron
 script:
-  - electron-mocha test/*.main.test.js
-  - electron-mocha --renderer test/*.renderer.test.js
+  - npm test
