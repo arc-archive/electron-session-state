@@ -1,6 +1,6 @@
 import { session, BrowserWindow, ipcMain, app } from 'electron';
 import EventEmitter from 'events';
-const PERSISTNAME = 'persist:web-session';
+export const PERSISTNAME = 'persist:web-session';
 /**
  * A class responsible for managing chrome web session.
  */
