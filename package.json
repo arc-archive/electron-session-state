@@ -5,16 +5,17 @@
   "main": "main/index.js",
   "module": "main/SessionManager.js",
   "scripts": {
-    "test": "npm run test-main && npm run test-renderer",
-    "test-main": "electron-mocha test/*.main.test.js",
-    "test-renderer": "electron-mocha --require-main test/main-preload.js --renderer test/*.renderer.test.js"
+    "test": "npm run test:main && npm run test:renderer",
+    "test:main": "electron-mocha --require esm test/*.main.test.js",
+    "test:renderer": "electron-mocha --require-main test/main-preload.js --renderer test/*.renderer.test.js",
+    "test:main:watch": "electron-mocha --require esm --watch test/*.main.test.js",
+    "test:renderer:watch": "electron-mocha --require-main test/main-preload.js --renderer --watch test/*.renderer.test.js"
   },
   "author": "Pawel Psztyc",
   "license": "Apache-2.0",
   "dependencies": {
     "@advanced-rest-client/arc-electron-helpers": "^1.1.1",
     "@advanced-rest-client/cookie-parser": "^3.1.0",
-    "electron": "^7.1.7",
     "esm": "^3.2.25"
   },
   "peerDependencies": {
@@ -23,15 +24,15 @@
   "devDependencies": {
     "@advanced-rest-client/eslint-config": "^1.1.4",
     "@advanced-rest-client/prettier-config": "^0.1.0",
+    "@commitlint/cli": "^8.3.5",
+    "@commitlint/config-conventional": "^8.3.4",
     "chai": "^4.2.0",
-    "electron-mocha": "^8.1.2",
-    "mocha": "^6.2.2",
+    "electron": "^7.1.10",
+    "electron-mocha": "^8.2.0",
     "eslint": "^6.8.0",
-    "@commitlint/cli": "^8.2.0",
-    "@commitlint/config-conventional": "^8.2.0",
-    "lint-staged": "^9.5.0",
-    "husky": "^3.1.0",
-    "electron": "^7.1.7"
+    "husky": "^4.2.1",
+    "lint-staged": "^10.0.3",
+    "mocha": "^7.0.1"
   },
   "repository": {
     "url": "https://github.com/advanced-rest-client/electron-session-state"
