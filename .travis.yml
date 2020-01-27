@@ -9,6 +9,6 @@ before_script:
   - Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
 install:
   - npm ci
-  - npm i --no-save electron
 script:
-  - npm test
+  - npm run test:main
+  - npm run test:renderer
