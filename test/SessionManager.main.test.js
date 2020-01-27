@@ -1,12 +1,12 @@
 const { assert } = require('chai');
-const { SessionManager } = require('../main');
+const { SessionManager, PERSISTNAME } = require('../main');
 const { session } = require('electron');
 
-describe('Session manager - main process', function() {
+describe('SessionManager - main process', function() {
   const url = 'https://domain.com/cookies';
 
   async function cleanCookies() {
-    const sis = session.fromPartition('persist:web-session');
+    const sis = session.fromPartition(PERSISTNAME);
     const Cookies = sis.cookies;
     const cookies = await Cookies.get({});
     if (!cookies || !cookies.length) {
@@ -24,18 +24,28 @@ describe('Session manager - main process', function() {
   }
 
   async function createTestCookies() {
-    const sis = session.fromPartition('persist:web-session');
+    const sis = session.fromPartition(PERSISTNAME);
     const Cookies = sis.cookies;
     await Cookies.set({
       url: 'https://domain.com/path',
       name: 't1',
-      value: 'v1'
+      value: 'v1',
     });
     await Cookies.set({
       url: 'https://other.com/',
       name: 't2',
-      value: 'v2'
+      value: 'v2',
     });
+  }
+
+  async function removeCookies(cookies) {
+    const sis = session.fromPartition(PERSISTNAME);
+    const Cookies = sis.cookies;
+    for (let i = 0, len = cookies.length; i < len; i++) {
+      const [url, name] = cookies[i];
+      await Cookies.remove(url, name);
+    }
+    await Cookies.flushStore();
   }
 
   describe('getSessionCookies()', () => {
@@ -67,8 +77,13 @@ describe('Session manager - main process', function() {
       instance.listen();
     });
 
-    afterEach(() => {
+    afterEach(async () => {
       instance.unlisten();
+      await removeCookies([
+        [url, name],
+        ['https://domain.com/', name],
+        ['http://qax.anypoint.mulesoft.com/', '_csrf']
+      ]);
     });
 
     it('creates a cookie', async () => {
@@ -92,6 +107,36 @@ describe('Session manager - main process', function() {
       });
       assert.equal(created.url, 'https://domain.com/');
     });
+
+    it('creates a cookie from renderer object', async () => {
+      const cookie = {
+        created: Date.now(),
+        domain: 'qax.anypoint.mulesoft.com',
+        expirationDate: 8640000000000,
+        hostOnly: true,
+        httponly: null,
+        lastAccess: 1580162723841,
+        name: '_csrf',
+        path: '/',
+        persistent: false,
+        value: 'GwjXpexHYiv22J9Bd7NUF-4c',
+      };
+      await instance.setCookie(cookie);
+
+      const cookies = await instance._session.get({});
+      assert.lengthOf(cookies, 1, 'has single cookie');
+      assert.deepEqual(cookies[0], {
+        name: '_csrf',
+        value: 'GwjXpexHYiv22J9Bd7NUF-4c',
+        domain: '.qax.anypoint.mulesoft.com',
+        hostOnly: false,
+        path: '/',
+        secure: false,
+        httpOnly: false,
+        session: false,
+        expirationDate: 8640000000000,
+      }, 'stores the cookie in the store');
+    });
   });
 
   describe('removeCookie()', () => {
@@ -109,17 +154,39 @@ describe('Session manager - main process', function() {
       instance.listen();
     });
 
-    afterEach(() => {
+    afterEach(async () => {
       instance.unlisten();
     });
 
-    it('Removes existing cookie', async () => {
+    it('removes existing cookie', async () => {
       const created = await instance.setCookie({
         url,
         name,
         value,
       });
       await instance.removeCookie(created);
+      const cookies = await instance._session.get({});
+      assert.lengthOf(cookies, 0);
+    });
+
+    it('removes renderer based cookie', async () => {
+      const cookie = {
+        created: Date.now(),
+        domain: 'qax.anypoint.mulesoft.com',
+        expirationDate: 8640000000000,
+        hostOnly: true,
+        httponly: null,
+        lastAccess: 1580162723841,
+        name: '_csrf',
+        path: '/',
+        persistent: false,
+        value: 'GwjXpexHYiv22J9Bd7NUF-4c',
+      };
+      await instance.setCookie(cookie);
+      await instance.removeCookie({
+        url: 'http://qax.anypoint.mulesoft.com/',
+        name: '_csrf'
+      });
       const cookies = await instance._session.get({});
       assert.lengthOf(cookies, 0);
     });
