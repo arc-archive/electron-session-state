@@ -171,6 +171,31 @@ describe('Cookie bridge - renderer process', function() {
         const request = await e.detail.promises[0];
         assert.equal(request.headers, 'cookie: test1=test1,test2=test2');
       });
+
+      it('ignores when ignoreSessionCookies is set on the bridge', async () => {
+        instance.ignoreSessionCookies = true;
+        const e = fire('before-request', {
+          url: 'http://other.com/',
+          method: 'GET',
+          headers: 'cookie: test1=test1',
+          promises: []
+        });
+        instance.ignoreSessionCookies = false;
+        assert.isUndefined(e.detail.promises[0]);
+      });
+
+      it('ignores when ignoreSessionCookies is set on config', async () => {
+        const e = fire('before-request', {
+          url: 'http://other.com/',
+          method: 'GET',
+          headers: 'cookie: test1=test1',
+          promises: [],
+          config: {
+            ignoreSessionCookies: true,
+          }
+        });
+        assert.isUndefined(e.detail.promises[0]);
+      });
     });
   });
 

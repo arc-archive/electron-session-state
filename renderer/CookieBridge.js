@@ -3,9 +3,12 @@ import { ArcHeaders } from '@advanced-rest-client/arc-electron-helpers';
 import { Cookies } from '@advanced-rest-client/cookie-parser';
 /**
  * Class responsible for cookie exchange between web app and the main process.
+ *
+ * When instance property `ignoreSessionCookies` is `true` then cookies are
+ * not added to the request.
  */
 export class CookieBridge {
-  constructor() {
+  constructor(appCnf={}) {
     this._onRequestAllCookies = this._onRequestAllCookies.bind(this);
     this._onRequestDomainCookies = this._onRequestDomainCookies.bind(this);
     this._onUpdateCookie = this._onUpdateCookie.bind(this);
@@ -13,6 +16,10 @@ export class CookieBridge {
     this._onRemoveCookies = this._onRemoveCookies.bind(this);
     this._beforeRequestHandler = this._beforeRequestHandler.bind(this);
     this._afterRequestHandler = this._afterRequestHandler.bind(this);
+
+    if (typeof appCnf.ignoreSessionCookies === 'boolean') {
+      this.ignoreSessionCookies = appCnf.ignoreSessionCookies;
+    }
   }
 
   listen() {
@@ -233,6 +240,13 @@ export class CookieBridge {
    * @param {CustomEvent} e
    */
   _beforeRequestHandler(e) {
+    if (this.ignoreSessionCookies) {
+      return
+    }
+    const { config } = e.detail;
+    if (config && config.ignoreSessionCookies === true) {
+      return;
+    }
     if (!e.detail.promises) {
       e.detail.promises = [];
     }
@@ -380,7 +394,7 @@ export class CookieBridge {
     });
     return {
       cookies: mainParser ? mainParser.cookies : [],
-      expired: expired
+      expired
     };
   }
 }
