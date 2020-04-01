@@ -6,13 +6,12 @@ export const PERSISTNAME = 'persist:web-session';
  */
 export class SessionManager extends EventEmitter {
   /**
-   * @param {?Object} opts [description]
+   * @param {?Object} opts Configuration options
+   * @param {?Array<String>} opts.appUrls A list of application internal URLs for
+   * which certificate error shouuld not be ignored.
    */
-  constructor(opts) {
+  constructor(opts={}) {
     super();
-    if (!opts) {
-      opts = {};
-    }
     this.appUrls = opts.appUrls;
     this._cookieChanged = this._cookieChanged.bind(this);
     this._handleOpenSessionWindow = this._handleOpenSessionWindow.bind(this);
