@@ -160,7 +160,7 @@ export class SessionManager extends EventEmitter {
         nodeIntegration: false
       }
     });
-    bw.loadURL(url);
+    bw.loadURL(url, { userAgent: 'Chrome' });
     return bw;
   }
 
